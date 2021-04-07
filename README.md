@@ -21,3 +21,11 @@ devcontainer 内で docker を使うために `/var/run/docker.sock` をマウ�
 ```
 
 シェルスクリプトをコピーして、本家の docker よりも優先されるように PATH を設定します。
+
+```
+RUN set -x \
+    && mkdir -p /usr/local/devcontainer-tool/bin \
+    && curl -fsSL -o /usr/local/devcontainer-tool/bin/docker https://raw.githubusercontent.com/thamaji/devcontainer-docker/main/docker \
+    && chmod +x /usr/local/devcontainer-tool/bin/docker
+ENV PATH=/usr/local/devcontainer-tool/bin:${PATH}
+```
