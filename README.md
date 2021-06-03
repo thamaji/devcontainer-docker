@@ -9,23 +9,12 @@ devcontainer 内で docker を使うために `/var/run/docker.sock` をマウ�
 
 ## Usage
 
-環境変数 CONTAINER_WORKSPACE と LOCAL_WORKSPACE が必要です。
-
-`.devcontainer/devcontainer.json` に以下の設定を追加してください。
-
-```
-"containerEnv": {
-    "CONTAINER_WORKSPACE": "${containerWorkspaceFolder}",
-    "LOCAL_WORKSPACE": "${localWorkspaceFolder}"
-}
-```
-
-シェルスクリプトをコピーして、本家の docker よりも優先されるように PATH を設定します。
+バイナリをコピーして、本家の docker よりも優先されるように PATH を設定します。
 
 ```
 RUN set -x \
     && mkdir -p /usr/local/devcontainer-tool/bin \
-    && curl -fsSL -o /usr/local/devcontainer-tool/bin/docker https://raw.githubusercontent.com/thamaji/devcontainer-docker/main/docker \
+    && curl -fsSL -o /usr/local/devcontainer-tool/bin/docker https://github.com/thamaji/devcontainer-docker/releases/download/v1.0.1/docker \
     && chmod +x /usr/local/devcontainer-tool/bin/docker
 ENV PATH=/usr/local/devcontainer-tool/bin:${PATH}
 ```
