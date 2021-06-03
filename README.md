@@ -5,7 +5,7 @@ VSCode Remote Container で devcontainer の中で docker を使うときの vol
 
 devcontainer 内で docker を使うために `/var/run/docker.sock` をマウントしていると、--volume で指定したパスが devcontainer 内のパスではなくホストのパスとして解釈されます。
 
-このツールは docker をラップし、volumes のパスを devcontainer 内のパスとして解釈させるものです。
+このツールは docker コマンドをラップし、volumes のパスを devcontainer 内のパスとして解釈させるものです。
 
 ## Usage
 
