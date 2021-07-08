@@ -13,7 +13,7 @@ import (
 )
 
 func convertComposeOptions(environment *devcontainer.Environment, options parser.Options) (parser.Options, func(), error) {
-	var file string
+	var files []string
 	var projectDirectory string
 
 	newOptions := make(parser.Options, 0, len(options))
@@ -21,7 +21,7 @@ func convertComposeOptions(environment *devcontainer.Environment, options parser
 	for _, option := range options {
 		switch option.Name {
 		case "-f", "--file":
-			file = option.Value
+			files = append(files, option.Value)
 
 		case "--project-directory":
 			projectDirectory = option.Value
@@ -31,51 +31,92 @@ func convertComposeOptions(environment *devcontainer.Environment, options parser
 		}
 	}
 
-	if file != "" && projectDirectory == "" {
-		projectDirectory = filepath.Dir(file)
+	if len(files) == 0 {
+		if v, ok := os.LookupEnv("COMPOSE_FILE"); ok {
+			os.Unsetenv("COMPOSE_FILE")
+
+			sep, ok := os.LookupEnv("COMPOSE_PATH_SEPARATOR")
+			if !ok {
+				sep = ":"
+			}
+
+			files = strings.Split(v, sep)
+		}
 	}
 
-	if file == "" {
-		file = "docker-compose.yml"
-		if _, err := os.Stat(file); err != nil {
-			file = "docker-compose.yaml"
+	if len(files) == 0 {
+		dir := "."
+	OUTER:
+		for {
+			for _, name := range []string{"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"} {
+				file := filepath.Join(dir, name)
+				if _, err := os.Stat(file); err == nil {
+					files = append(files, file)
+
+					for _, name := range []string{"docker-compose.override.yml", "docker-compose.override.yaml", "compose.override.yml", "compose.override.yaml"} {
+						file := filepath.Join(dir, name)
+						if _, err := os.Stat(file); err == nil {
+							files = append(files, file)
+						}
+					}
+
+					break OUTER
+				}
+			}
+
+			if dir == "/" {
+				break
+			}
+			dir = filepath.Join(dir, "../")
 		}
 	}
 
 	if projectDirectory == "" {
-		projectDirectory = "."
+		if len(files) > 0 {
+			projectDirectory = filepath.Dir(files[0])
+		} else {
+			projectDirectory = "."
+		}
 	}
 
-	path, err := createFakeComposeYaml(environment, projectDirectory, file)
-	if err != nil {
-		return nil, nil, err
-	}
-	if path == "" {
-		return options, nil, nil
-	}
+	tempFiles := []string{}
+	for i := range files {
+		file, ok, err := createFakeComposeYaml(environment, projectDirectory, files[i])
+		if err != nil {
+			return nil, nil, err
+		}
+		if ok {
+			tempFiles = append(tempFiles, file)
+		}
 
-	newOptions.Add("--file", path)
+		newOptions.Add("--file", file)
+	}
 	newOptions.Add("--project-directory", projectDirectory)
-	onExit := func() { os.Remove(path) }
+	onExit := func() {
+		for _, tempFile := range tempFiles {
+			os.Remove(tempFile)
+		}
+	}
 	return newOptions, onExit, nil
 }
 
-func createFakeComposeYaml(environment *devcontainer.Environment, projectDirectory string, file string) (dst string, err error) {
+func createFakeComposeYaml(environment *devcontainer.Environment, projectDirectory string, file string) (dst string, ok bool, err error) {
 	defer func() {
 		if recover() != nil {
-			dst = ""
+			dst = file
+			ok = false
 		}
 	}()
 
 	text, err := ioutil.ReadFile(file)
 	if err != nil {
-		return "", nil
+		return file, false, nil
 	}
 
 	var data interface{}
 
 	if err := yaml.Unmarshal(text, &data); err != nil {
-		return "", nil
+		return file, false, nil
 	}
 
 	compose := reflect.ValueOf(data)
@@ -109,7 +150,7 @@ func createFakeComposeYaml(environment *devcontainer.Environment, projectDirecto
 
 				hostPath, err := environment.GetHostPath(path)
 				if err != nil {
-					return "", err
+					return "", false, err
 				}
 				params[0] = hostPath
 
@@ -125,7 +166,7 @@ func createFakeComposeYaml(environment *devcontainer.Environment, projectDirecto
 
 					hostPath, err := environment.GetHostPath(path)
 					if err != nil {
-						return "", err
+						return "", false, err
 					}
 					volume.SetMapIndex(reflect.ValueOf("source"), reflect.ValueOf(hostPath))
 				}
@@ -135,14 +176,14 @@ func createFakeComposeYaml(environment *devcontainer.Environment, projectDirecto
 
 	f, err := os.CreateTemp(os.TempDir(), "docker-compose-*.yml")
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	err = yaml.NewEncoder(f).Encode(data)
 	f.Close()
 	if err != nil {
 		os.Remove(f.Name())
-		return "", err
+		return "", false, err
 	}
 
-	return f.Name(), nil
+	return f.Name(), true, nil
 }

@@ -59,6 +59,7 @@ func (command *command) execute(cliPath string) int {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
 	exitCode := 255
 	if err := cmd.Start(); err == nil {
 		_ = cmd.Wait()
