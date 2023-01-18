@@ -33,6 +33,7 @@ func (environment *Environment) GetContainerID() (string, error) {
 	}
 
 	f, err := os.Open("/proc/self/mountinfo")
+	defer f.Close()
 	if err != nil {
 		return "", err
 	}
