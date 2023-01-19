@@ -14,7 +14,7 @@ devcontainer 内で docker を使うために `/var/run/docker.sock` をマウ�
 ```
 RUN set -x \
     && mkdir -p /usr/local/devcontainer-tool/bin \
-    && curl -fsSL -o /usr/local/devcontainer-tool/bin/docker https://github.com/thamaji/devcontainer-docker/releases/download/v1.0.1/docker \
+    && curl -fsSL -o /usr/local/devcontainer-tool/bin/docker https://github.com/thamaji/devcontainer-docker/releases/download/v1.0.3/docker \
     && chmod +x /usr/local/devcontainer-tool/bin/docker
 ENV PATH=/usr/local/devcontainer-tool/bin:${PATH}
 ```
