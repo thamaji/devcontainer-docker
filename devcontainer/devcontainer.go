@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -27,40 +28,42 @@ type mountInfo struct {
 	Destination string
 }
 
+var patterns = []*regexp.Regexp{
+	regexp.MustCompile("/docker/([\\w+-.]{64}) "),
+	regexp.MustCompile("/docker/containers/([\\w+-.]{64})/"),
+}
+
 func (environment *Environment) GetContainerID() (string, error) {
 	if environment.containerID != "" {
 		return environment.containerID, nil
 	}
 
+	var cid string
+
 	f, err := os.Open("/proc/self/mountinfo")
-	defer f.Close()
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
-	var content string
+SCAN:
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, "/etc/hosts") && strings.Contains(line, "/docker/containers") {
-			results := strings.Split(line, "/docker/containers")
-			if len(results) < 2 {
-				return "", errors.New("unexpected mountinfo: " + line)
+		for _, pattern := range patterns {
+			matches := pattern.FindStringSubmatch(line)
+			if len(matches) < 2 {
+				continue
 			}
-			results = strings.Split(results[1], "/")
-			if len(results) < 2 {
-				return "", errors.New("unexpected mountinfo: " + line)
-			}
-			content = results[1]
-			break
+			cid = matches[1]
+			break SCAN
 		}
 	}
-
-	if content == "" {
+	if cid == "" {
 		return "", errors.New("failed to get container id")
 	}
 
-	environment.containerID = content
+	environment.containerID = cid
 
 	return environment.containerID, nil
 }
