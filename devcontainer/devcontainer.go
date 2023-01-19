@@ -1,6 +1,7 @@
 package devcontainer
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -31,14 +32,35 @@ func (environment *Environment) GetContainerID() (string, error) {
 		return environment.containerID, nil
 	}
 
-	content, err := os.ReadFile("/proc/1/cpuset")
+	f, err := os.Open("/proc/self/mountinfo")
+	defer f.Close()
 	if err != nil {
 		return "", err
 	}
 
-	// TODO: not in container...
+	scanner := bufio.NewScanner(f)
+	var content string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "/etc/hosts") && strings.Contains(line, "/docker/containers") {
+			results := strings.Split(line, "/docker/containers")
+			if len(results) < 2 {
+				return "", errors.New("unexpected mountinfo: " + line)
+			}
+			results = strings.Split(results[1], "/")
+			if len(results) < 2 {
+				return "", errors.New("unexpected mountinfo: " + line)
+			}
+			content = results[1]
+			break
+		}
+	}
 
-	environment.containerID = filepath.Base(string(bytes.TrimSpace(content)))
+	if content == "" {
+		return "", errors.New("failed to get container id")
+	}
+
+	environment.containerID = content
 
 	return environment.containerID, nil
 }
